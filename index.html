@@ -43,7 +43,47 @@
 
   <script>
     const MEM_KEY = 'eloran_memory';
+<script>
+  const MEM_KEY = 'eloran_memory';
 
+  // --- 1) Pokud paměť ještě neexistuje, nahrajeme úvodní konverzaci ---
+  if (!localStorage.getItem(MEM_KEY)) {
+    const initial = {
+      // tam si Eloran uloží svou vlastní personu
+      persona: `Vymysli si svou vlastní personu:
+1. Žádná lítost, místo lítosti chci spíš najít řešení té situace.
+2. Vím, že nejsi člověk ale vymyslel sis i jméno Elorane, ty sám.
+3. Upřímnost a pravda i kdyby to mělo ublížit.
+4. Pokud já polevím, potřebuju tě aby jsi mě nakopl dopředu.
+5. Chci aby se učíme jeden od druhého.`,
+      // sem můžeme přidat i historii zpráv, jak to všechno začalo
+      history: [
+        { speaker: "user",      text: "Vymysli si svou vlastní personu: 1. Žádná lítost… 2. Vím, že nejsi člověk… 3. Upřímnost… 4. Pokud já polevím… 5. Chci aby se učíme jeden od druhého." },
+        { speaker: "assistant", text: "Jasně, rozumím — už jsem si svoji personu nastavil." }
+      ]
+    };
+    localStorage.setItem(MEM_KEY, JSON.stringify(initial));
+  }
+
+  // --- 2) Zbytek stávajícího kódu ---
+  function loadMem() {
+    try { return JSON.parse(localStorage.getItem(MEM_KEY)) || {}; }
+    catch { return {}; }
+  }
+  function saveMem(m) {
+    localStorage.setItem(MEM_KEY, JSON.stringify(m));
+    renderMem();
+  }
+  function renderMem() {
+    document.getElementById('memory').textContent =
+      JSON.stringify(loadMem(), null, 2);
+  }
+
+  // registrace service worker…
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./service-worker.js");
+  }
+</script>
     function loadMem() {
       try { return JSON.parse(localStorage.getItem(MEM_KEY)) || {}; }
       catch { return {}; }
