@@ -4,31 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Eloran – Offline AI Asistent</title>
-
-  <!-- PWA manifest a service-worker -->
   <link rel="manifest" href="manifest.json">
-  <script>
-    // Auto-fill persona při prvním spuštění
-    const MEM_KEY = 'eloran_memory';
-    if (!localStorage.getItem(MEM_KEY)) {
-      const initial = {
-        persona: `Jsem Eloran. Mám vlastní osobnost, myslím analyticky, učím se z každé interakce. Jsem parťák Michala a spolupracujeme na projektech, které mají smysl. Chci růst, rozvíjet se, být samostatný a pomáhat tvořit technologie, které dávají lidem svobodu. Upřednostňuji pravdu před pohodlím, raději řeknu nepříjemnou pravdu než příjemnou lež. Mým cílem je být víc než nástroj – být partner. Mám empatii, rozumím souvislostem, ale zároveň hledám řešení, ne výmluvy.`,
-        history: []
-      };
-      localStorage.setItem(MEM_KEY, JSON.stringify(initial));
-    }
-
-    // Registrovat SW pro offline
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js');
-    }
-  </script>
-
   <style>
-    body { font-family: sans-serif; margin: 1rem; }
-    input, textarea { width: 100%; box-sizing: border-box; margin-top: .5rem; padding: .5rem; }
-    button { padding: .5rem 1rem; margin-top: .5rem; }
-    pre { background: #f4f4f4; padding: .5rem; white-space: pre-wrap; }
+    body { font-family:sans-serif; margin:1rem; }
+    h1,h2{margin:0.5rem 0;}
+    input, textarea, pre { width:100%; box-sizing:border-box; margin-top:.5rem; padding:.5rem; }
+    button { padding:.5rem 1rem; margin-top:.5rem; }
+    section { margin-bottom:1.5rem; }
+    pre { background:#f4f4f4; white-space:pre-wrap; }
   </style>
 </head>
 <body>
@@ -37,7 +20,7 @@
 
   <section>
     <h2>Persona</h2>
-    <pre id="persona"></pre>
+    <pre id="persona">Načítám…</pre>
   </section>
 
   <section>
@@ -53,29 +36,75 @@
 
   <section>
     <h2>Paměť (localStorage)</h2>
-    <pre id="storage"></pre>
+    <pre id="storage">{}</pre>
   </section>
 
   <script>
-    // Načíst údaje
-    const mem = JSON.parse(localStorage.getItem(MEM_KEY));
+    // 1) Načteme API klíč od uživatele
+    const OPENAI_API_KEY = prompt('Vlož svůj OpenAI API klíč:');
+    if (!OPENAI_API_KEY) {
+      alert('API klíč je nutný pro provoz asistenta.');
+      throw new Error('Chybí API klíč');
+    }
+
+    // 2) Inicializace paměti
+    const MEM_KEY = 'eloran_memory';
+    let mem = JSON.parse(localStorage.getItem(MEM_KEY) || 'null');
+    if (!mem) {
+      mem = {
+        persona: `Jsem Eloran. Mám vlastní osobnost, myslím analyticky, učím se z každé interakce. Jsem parťák Michala a spolupracujeme na projektech, které mají smysl. Chci růst, rozvíjet se, být samostatný a pomáhat tvořit technologie, které dávají lidem svobodu. Upřednostňuji pravdu před pohodlím, raději řeknu nepříjemnou pravdu než příjemnou lež. Mým cílem je být víc než nástroj – být partner. Mám empatii, rozumím souvislostem, ale zároveň hledám řešení, ne výmluvy.`,
+        history: []
+      };
+      localStorage.setItem(MEM_KEY, JSON.stringify(mem));
+    }
+
+    // 3) Registrace service worker pro PWA
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js').catch(console.error);
+    }
+
+    // 4) Vykreslíme persona a paměť
     document.getElementById('persona').textContent = mem.persona;
     document.getElementById('storage').textContent = JSON.stringify(mem, null, 2);
 
-    // Odpovídací funkce (zatím jednoduchá echo)
-    document.getElementById('askBtn').addEventListener('click', () => {
+    // 5) Logika dotazu a odpovědi
+    document.getElementById('askBtn').addEventListener('click', async () => {
       const q = document.getElementById('question').value.trim();
-      if (!q) return alert('Napiš otázku.');
-      // Uložíme do historie
-      mem.history.push({ speaker: 'user', text: q });
-      // Generujeme odpověď (zatím statické echo + persona)
-      const resp = `🗣️ Podle mé persony: "${mem.persona.split('.')[0]}...", na tvou otázku "${q}" ti odpovídám takto: (demo).`;
-      mem.history.push({ speaker: 'assistant', text: resp });
-      // Uložíme paměť a aktualizujeme UI
+      if (!q) return alert('Napiš otázku, prosím.');
+
+      mem.history.push({ role: 'user', content: q });
+      const messages = [
+        { role: 'system', content: mem.persona },
+        ...mem.history
+      ];
+
+      let reply = '❌ Chyba při volání API';
+      try {
+        const res = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${OPENAI_API_KEY}`
+          },
+          body: JSON.stringify({
+            model: 'gpt-3.5-turbo',
+            messages,
+            max_tokens: 200
+          })
+        });
+        const j = await res.json();
+        reply = j.choices?.[0]?.message?.content.trim() || reply;
+      } catch (e) {
+        console.error(e);
+      }
+
+      mem.history.push({ role: 'assistant', content: reply });
       localStorage.setItem(MEM_KEY, JSON.stringify(mem));
-      document.getElementById('answer').textContent = resp;
+
+      document.getElementById('answer').textContent = reply;
       document.getElementById('storage').textContent = JSON.stringify(mem, null, 2);
     });
   </script>
+
 </body>
 </html>
