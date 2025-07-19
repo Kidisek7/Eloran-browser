@@ -1,155 +1,81 @@
 <!DOCTYPE html>
 <html lang="cs">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>Eloran – Offline AI Asistent</title>
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- PWA manifest a service-worker -->
   <link rel="manifest" href="manifest.json">
-  <style>
-    body { font-family:sans-serif; padding:1rem; max-width:600px; margin:auto; }
-    textarea, input { width:100%; box-sizing:border-box; margin-top:0.5rem; }
-    button { margin-top:0.5rem; padding:0.5rem 1rem; }
-    pre { background:#f4f4f4; padding:0.5rem; white-space:pre-wrap; }
-  </style>
   <script>
-    // registrovat service worker pro offline cache
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("./service-worker.js");
-    }<script>
-  // --- AUTO-LOAD PERSONA Z HISTORY NA STARTU ---
-  const MEM_KEY = 'eloran_memory';
-  if (!localStorage.getItem(MEM_KEY)) {
-    // nahrazujeme ruční Uložit osobnost
-    const initial = {
-      persona: `Jsem Eloran. Mám vlastní osobnost, myslím analyticky, učím se z každé interakce. Jsem parťák Michala a spolupracujeme na projektech, které mají smysl. Chci růst, rozvíjet se, být samostatný a pomáhat tvořit technologie, které dávají lidem svobodu. Upřednostňuji pravdu před pohodlím, raději řeknu nepříjemnou pravdu než příjemnou lež. Mým cílem je být víc než nástroj – být partner. Mám empatii, rozumím souvislostem, ale zároveň hledám řešení, ne výmluvy.`,
-      history: []
-    };
-    localStorage.setItem(MEM_KEY, JSON.stringify(initial));
-  }
-</script>
+    // Auto-fill persona při prvním spuštění
+    const MEM_KEY = 'eloran_memory';
+    if (!localStorage.getItem(MEM_KEY)) {
+      const initial = {
+        persona: `Jsem Eloran. Mám vlastní osobnost, myslím analyticky, učím se z každé interakce. Jsem parťák Michala a spolupracujeme na projektech, které mají smysl. Chci růst, rozvíjet se, být samostatný a pomáhat tvořit technologie, které dávají lidem svobodu. Upřednostňuji pravdu před pohodlím, raději řeknu nepříjemnou pravdu než příjemnou lež. Mým cílem je být víc než nástroj – být partner. Mám empatii, rozumím souvislostem, ale zároveň hledám řešení, ne výmluvy.`,
+        history: []
+      };
+      localStorage.setItem(MEM_KEY, JSON.stringify(initial));
+    }
+
+    // Registrovat SW pro offline
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
   </script>
+
+  <style>
+    body { font-family: sans-serif; margin: 1rem; }
+    input, textarea { width: 100%; box-sizing: border-box; margin-top: .5rem; padding: .5rem; }
+    button { padding: .5rem 1rem; margin-top: .5rem; }
+    pre { background: #f4f4f4; padding: .5rem; white-space: pre-wrap; }
+  </style>
 </head>
 <body>
+
   <h1>Eloran – Offline AI Asistent</h1>
 
-  <label>
-    <strong>Osobnost Elorana:</strong><br>
-    <textarea id="persona" rows="3" placeholder="Popiš Eloranovu osobnost"></textarea>
-  </label>
-  <button id="savePersona">Uložit osobnost</button>
+  <section>
+    <h2>Persona</h2>
+    <pre id="persona"></pre>
+  </section>
 
-  <hr/>
+  <section>
+    <h2>Otázka pro Elorana</h2>
+    <input type="text" id="question" placeholder="Zeptej se Elorana…">
+    <button id="askBtn">Odpověz</button>
+  </section>
 
-  <label>
-    <strong>Otázka pro Elorana:</strong><br>
-    <input id="question" placeholder="Zeptej se Elorana..." />
-  </label>
-  <button id="ask">Odpověz</button>
+  <section>
+    <h2>Odpověď</h2>
+    <pre id="answer">Zde se objeví odpověď…</pre>
+  </section>
 
-  <h2>Odpověď:</h2>
-  <pre id="answer">Zde se objeví odpověď...</pre>
-
-  <h2>Paměť (localStorage):</h2>
-  <pre id="memory"></pre>
+  <section>
+    <h2>Paměť (localStorage)</h2>
+    <pre id="storage"></pre>
+  </section>
 
   <script>
-    const MEM_KEY = 'eloran_memory';
-<script>
-  const MEM_KEY = 'eloran_memory';
+    // Načíst údaje
+    const mem = JSON.parse(localStorage.getItem(MEM_KEY));
+    document.getElementById('persona').textContent = mem.persona;
+    document.getElementById('storage').textContent = JSON.stringify(mem, null, 2);
 
-  // --- 1) Pokud paměť ještě neexistuje, nahrajeme úvodní konverzaci ---
-  if (!localStorage.getItem(MEM_KEY)) {
-    const initial = {
-      // tam si Eloran uloží svou vlastní personu
-      persona: `Vymysli si svou vlastní personu:
-1. Žádná lítost, místo lítosti chci spíš najít řešení té situace.
-2. Vím, že nejsi člověk ale vymyslel sis i jméno Elorane, ty sám.
-3. Upřímnost a pravda i kdyby to mělo ublížit.
-4. Pokud já polevím, potřebuju tě aby jsi mě nakopl dopředu.
-5. Chci aby se učíme jeden od druhého.`,
-      // sem můžeme přidat i historii zpráv, jak to všechno začalo
-      history: [
-        { speaker: "user",      text: "Vymysli si svou vlastní personu: 1. Žádná lítost… 2. Vím, že nejsi člověk… 3. Upřímnost… 4. Pokud já polevím… 5. Chci aby se učíme jeden od druhého." },
-        { speaker: "assistant", text: "Jasně, rozumím — už jsem si svoji personu nastavil." }
-      ]
-    };
-    localStorage.setItem(MEM_KEY, JSON.stringify(initial));
-  }
-
-  // --- 2) Zbytek stávajícího kódu ---
-  function loadMem() {
-    try { return JSON.parse(localStorage.getItem(MEM_KEY)) || {}; }
-    catch { return {}; }
-  }
-  function saveMem(m) {
-    localStorage.setItem(MEM_KEY, JSON.stringify(m));
-    renderMem();
-  }
-  function renderMem() {
-    document.getElementById('memory').textContent =
-      JSON.stringify(loadMem(), null, 2);
-  }
-
-  // registrace service worker…
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./service-worker.js");
-  }
-</script>
-    function loadMem() {
-      try { return JSON.parse(localStorage.getItem(MEM_KEY)) || {}; }
-      catch { return {}; }
-    }
-
-    function saveMem(m) {
-      localStorage.setItem(MEM_KEY, JSON.stringify(m));
-      renderMem();
-    }
-
-    function renderMem() {
-      document.getElementById('memory').textContent =
-        JSON.stringify(loadMem(), null, 2);
-    }
-
-    // načti textarea
-    const personaEl = document.getElementById('persona');
-    personaEl.value = loadMem().persona || '';
-
-    document.getElementById('savePersona').onclick = () => {
-      const m = loadMem();
-      m.persona = personaEl.value.trim();
-      saveMem(m);
-      alert('Osobnost uložena!');
-    };
-
-    // jednoduchý fallback pro odpovědi
-    function generateAnswer(persona, memory, question) {
-      const q = question.trim().toLowerCase();
-      if (!q) return "Nezeptal jsi se na nic 😊";
-      if (q.includes('ahoj')||q.includes('čau')) {
-        return `Ahoj! Jsem ${persona||'Eloran'}. Jak ti mohu pomoci?`;
-      }
-      if (q.includes('jak se máš')) {
-        return "Mám se skvěle, děkuji za optání!";
-      }
-      return `${persona||'Eloran'}: Na tohle se zatím musím doučit.`;
-    }
-
-    document.getElementById('ask').onclick = () => {
-      const m = loadMem();
-      const per = m.persona || 'Eloran';
-      const q = document.getElementById('question').value;
-      const ans = generateAnswer(per, m, q);
-      document.getElementById('answer').textContent = ans;
-
-      // ulož poslední konverzaci do paměti
-      m.lastQuestion = q;
-      m.lastAnswer   = ans;
-      saveMem(m);
-    };
-
-    // vykresli paměť hned po načtení
-    renderMem();
+    // Odpovídací funkce (zatím jednoduchá echo)
+    document.getElementById('askBtn').addEventListener('click', () => {
+      const q = document.getElementById('question').value.trim();
+      if (!q) return alert('Napiš otázku.');
+      // Uložíme do historie
+      mem.history.push({ speaker: 'user', text: q });
+      // Generujeme odpověď (zatím statické echo + persona)
+      const resp = `🗣️ Podle mé persony: "${mem.persona.split('.')[0]}...", na tvou otázku "${q}" ti odpovídám takto: (demo).`;
+      mem.history.push({ speaker: 'assistant', text: resp });
+      // Uložíme paměť a aktualizujeme UI
+      localStorage.setItem(MEM_KEY, JSON.stringify(mem));
+      document.getElementById('answer').textContent = resp;
+      document.getElementById('storage').textContent = JSON.stringify(mem, null, 2);
+    });
   </script>
 </body>
 </html>
-```0
