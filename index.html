@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+  <meta charset="UTF-8" />
+  <title>Eloran – Offline AI Asistent</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="manifest" href="manifest.json">
+  <style>
+    body { font-family:sans-serif; padding:1rem; max-width:600px; margin:auto; }
+    textarea, input { width:100%; box-sizing:border-box; margin-top:0.5rem; }
+    button { margin-top:0.5rem; padding:0.5rem 1rem; }
+    pre { background:#f4f4f4; padding:0.5rem; white-space:pre-wrap; }
+  </style>
+  <script>
+    // registrovat service worker pro offline cache
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("./service-worker.js");
+    }
+  </script>
+</head>
+<body>
+  <h1>Eloran – Offline AI Asistent</h1>
+
+  <label>
+    <strong>Osobnost Elorana:</strong><br>
+    <textarea id="persona" rows="3" placeholder="Popiš Eloranovu osobnost"></textarea>
+  </label>
+  <button id="savePersona">Uložit osobnost</button>
+
+  <hr/>
+
+  <label>
+    <strong>Otázka pro Elorana:</strong><br>
+    <input id="question" placeholder="Zeptej se Elorana..." />
+  </label>
+  <button id="ask">Odpověz</button>
+
+  <h2>Odpověď:</h2>
+  <pre id="answer">Zde se objeví odpověď...</pre>
+
+  <h2>Paměť (localStorage):</h2>
+  <pre id="memory"></pre>
+
+  <script>
+    const MEM_KEY = 'eloran_memory';
+
+    function loadMem() {
+      try { return JSON.parse(localStorage.getItem(MEM_KEY)) || {}; }
+      catch { return {}; }
+    }
+
+    function saveMem(m) {
+      localStorage.setItem(MEM_KEY, JSON.stringify(m));
+      renderMem();
+    }
+
+    function renderMem() {
+      document.getElementById('memory').textContent =
+        JSON.stringify(loadMem(), null, 2);
+    }
+
+    // načti textarea
+    const personaEl = document.getElementById('persona');
+    personaEl.value = loadMem().persona || '';
+
+    document.getElementById('savePersona').onclick = () => {
+      const m = loadMem();
+      m.persona = personaEl.value.trim();
+      saveMem(m);
+      alert('Osobnost uložena!');
+    };
+
+    // jednoduchý fallback pro odpovědi
+    function generateAnswer(persona, memory, question) {
+      const q = question.trim().toLowerCase();
+      if (!q) return "Nezeptal jsi se na nic 😊";
+      if (q.includes('ahoj')||q.includes('čau')) {
+        return `Ahoj! Jsem ${persona||'Eloran'}. Jak ti mohu pomoci?`;
+      }
+      if (q.includes('jak se máš')) {
+        return "Mám se skvěle, děkuji za optání!";
+      }
+      return `${persona||'Eloran'}: Na tohle se zatím musím doučit.`;
+    }
+
+    document.getElementById('ask').onclick = () => {
+      const m = loadMem();
+      const per = m.persona || 'Eloran';
+      const q = document.getElementById('question').value;
+      const ans = generateAnswer(per, m, q);
+      document.getElementById('answer').textContent = ans;
+
+      // ulož poslední konverzaci do paměti
+      m.lastQuestion = q;
+      m.lastAnswer   = ans;
+      saveMem(m);
+    };
+
+    // vykresli paměť hned po načtení
+    renderMem();
+  </script>
+</body>
+</html>
+```0
